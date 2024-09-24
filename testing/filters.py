@@ -6,7 +6,7 @@ fs = 10.0
 cutoff = 2.0
 highpass_cutoff = 0.1
 
-def butter_lpf(data, cutoff, fs, order=4):
+def low_pass_filter(data, cutoff, fs, order=4):
     nyquist = 0.5 * fs
     normal_cutoff = cutoff / nyquist
     b, a = butter(order, normal_cutoff, btype='low', analog=False)

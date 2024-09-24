@@ -53,4 +53,4 @@ while True:
         break
     else:
         print(f"Calibration status - System: {cal_status[0]}, Gyro: {cal_status[1]}, Accel: {cal_status[2]}, Mag: {cal_status[3]}")
-    time.sleep(1)
+    time.sleep(0.5)

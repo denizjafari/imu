@@ -35,9 +35,9 @@ def load_calibration(sensor):
         with open("calibration_data.json", "r") as file:
             calibration_data = json.load(file)
 
-        sensor.offsets_accelerometer = calibration_data["accel_offsets"]
-        sensor.offsets_gyroscope = calibration_data["gyro_offsets"]
-        sensor.offsets_magnetometer = calibration_data["mag_offsets"]
+        sensor.offsets_accelerometer = tuple(calibration_data["accel_offsets"])
+        sensor.offsets_gyroscope = tuple(calibration_data["gyro_offsets"])
+        sensor.offsets_magnetometer = tuple(calibration_data["mag_offsets"])
         sensor.radius_accelerometer = calibration_data["accel_radius"]
         sensor.radius_magnetometer = calibration_data["mag_radius"]
 

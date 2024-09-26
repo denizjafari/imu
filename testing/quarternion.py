@@ -1,37 +1,101 @@
 import time
 import board
 import busio
+import numpy as np
+import math
 import matplotlib.pyplot as plt
 from adafruit_bno055 import BNO055_I2C
-from calib_seq_v2 import load_calibration
+from filters import high_pass_filter, low_pass_filter
+from calib_seq_v2 import load_calibration_0x28
 
 fs = 10.0
 cutoff = 1
 highpass_cutoff = 0
 
-# Set up I2C and sensors
+# Set up I2C and sensor
 i2c = busio.I2C(board.SCL, board.SDA)
-sensors = {
-    "sensor_1": BNO055_I2C(i2c, address=0x28),
-    "sensor_2": BNO055_I2C(i2c, address=0x29)
-}
-def read_angles(sensor):
-  quaternion = sensor.quaternion
-  
-  qw = high_pass_filter(low_pass_filter(quaternion[0], cutoff, fs), highpass_cutoff, fs)
-  qx = high_pass_filter(low_pass_filter(quaternion[1], cutoff, fs), highpass_cutoff, fs)
-  qy = high_pass_filter(low_pass_filter(quaternion[2], cutoff, fs), highpass_cutoff, fs)
-  qz = high_pass_filter(low_pass_filter(quaternion[3], cutoff, fs), highpass_cutoff, fs)
-  
-  Vector<3> angles;
+sensor = BNO055_I2C(i2c, address=0x28)
 
-  angles.x() = atan2(2.0 * (qx * qy + qz * qw), (pow(qx,2) - pow(qy,2) - pow(qz,2) + pow(qw,2)));
-  angles.y() = asin(-2.0 * (qx * qz - qy * qw) / (pow(qx,2) + pow(qy,2) + pow(qz,2) + pow(qw,2)));
-  angles.z() = atan2(2.0 * (qy * qz + qx * qw), (-pow(qx,2) - pow(qy,2) + pow(qz,2) + pow(qw,2)));
+def rad_to_degrees(rad):
+    return rad*180 / math.pi
 
-  return angles;
-  
+# Function to read and filter angles
+def read_angles(sensor, cutoff, highpass_cutoff, fs):
+    quaternion = sensor.quaternion
+    
+    # Apply filters
+    '''qw = high_pass_filter(low_pass_filter(quaternion[0], cutoff, fs), highpass_cutoff, fs)
+    qx = high_pass_filter(low_pass_filter(quaternion[1], cutoff, fs), highpass_cutoff, fs)
+    qy = high_pass_filter(low_pass_filter(quaternion[2], cutoff, fs), highpass_cutoff, fs)
+    qz = high_pass_filter(low_pass_filter(quaternion[3], cutoff, fs), highpass_cutoff, fs)'''
 
-load_calibration(sensor["sensor_1"])
-load_calibration(sensor["sensor_2"])
+    if any(q is None for q in quaternion):
+        return np.zeros(3)
 
+    qw = quaternion[0]
+    qx = quaternion[1]
+    qy = quaternion[2]
+    qz = quaternion[3]
+    
+    # Calculate angles (roll, pitch, yaw)
+    angles = np.zeros(3)
+    angles[0] = rad_to_degrees(math.atan2(2.0 * (qx * qy + qz * qw), (qx**2 - qy**2 - qz**2 + qw**2)))  # Roll
+    angles[1] = rad_to_degrees(math.asin(-2.0 * (qx * qz - qy * qw) / (qx**2 + qy**2 + qz**2 + qw**2)))  # Pitch
+    angles[2] = rad_to_degrees(math.atan2(2.0 * (qy * qz + qx * qw), (-qx**2 - qy**2 + qz**2 + qw**2)))  # Yaw
+
+    print(f"Roll: {angles[0]:.2f}, Pitch: {angles[1]:.2f}, Yaw: {angles[2]:.2f}")
+
+    return angles
+
+# Load calibration for sensor
+load_calibration_0x28(sensor)
+
+# Create empty lists for plotting data
+time_data, roll, pitch, yaw = [], [], [], []
+
+# Set up real-time plotting
+plt.ion()
+fig, ax = plt.subplots()
+line_roll, = ax.plot([], [], label="Roll", color='r')
+line_pitch, = ax.plot([], [], label="Pitch", color='g')
+line_yaw, = ax.plot([], [], label="Yaw", color='b')
+
+ax.set_xlim(0, 10)
+ax.set_ylim(-180, 180)
+plt.legend()
+plt.title("Real-Time IMU Angles (Roll, Pitch, Yaw)")
+plt.xlabel("Time (s)")
+plt.ylabel("Angle (radians)")
+
+# Time tracking
+start_time = time.time()
+
+def update_plot():
+    line_roll.set_data(time_data, roll)
+    line_pitch.set_data(time_data, pitch)
+    line_yaw.set_data(time_data, yaw)
+    
+    ax.set_xlim(max(0, time_data[-1] - 10), time_data[-1])
+    plt.draw()
+    plt.pause(0.01)
+
+while True:
+    current_time = time.time() - start_time
+    time_data.append(current_time)
+    
+    angles = read_angles(sensor, cutoff, highpass_cutoff, fs)
+    
+    roll.append(angles[0])
+    pitch.append(angles[1])
+    yaw.append(angles[2])
+    
+    update_plot()
+    
+    # Limit stored data
+    if len(time_data) > 1000:
+        time_data.pop(0)
+        roll.pop(0)
+        pitch.pop(0)
+        yaw.pop(0)
+    
+    time.sleep(0.1)

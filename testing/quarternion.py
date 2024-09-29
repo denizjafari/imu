@@ -7,11 +7,12 @@ import matplotlib.pyplot as plt
 from adafruit_bno055 import BNO055_I2C
 from scipy.signal import butter, lfilter
 from filters import high_pass_filter, low_pass_filter, clip_data 
+from calib_seq_v2 import load_calibration_0x28
 
 # Set up filtering parameters
 fs = 10.0
-cutoff = 1.5
-highpass_cutoff = 0.01
+cutoff = 2
+highpass_cutoff = 0.005
 
 # Function to convert radians to degrees
 def rad_to_degrees(rad):
@@ -20,6 +21,9 @@ def rad_to_degrees(rad):
 # Set up I2C and sensor
 i2c = busio.I2C(board.SCL, board.SDA)
 sensor = BNO055_I2C(i2c, address=0x28)
+print(f"Current mode: {sensor.mode}")
+
+load_calibration_0x28(sensor)
 
 # Function to read and filter angles
 def read_angles(sensor, cutoff, highpass_cutoff, fs):
@@ -29,10 +33,21 @@ def read_angles(sensor, cutoff, highpass_cutoff, fs):
         return np.zeros(3)
 
     # Apply filters to each quaternion component
-    qw = clip_data(high_pass_filter(low_pass_filter([quaternion[0]], cutoff, fs), highpass_cutoff, fs)[-1])
-    qx = clip_data(high_pass_filter(low_pass_filter([quaternion[1]], cutoff, fs), highpass_cutoff, fs)[-1])
-    qy = clip_data(high_pass_filter(low_pass_filter([quaternion[2]], cutoff, fs), highpass_cutoff, fs)[-1])
-    qz = clip_data(high_pass_filter(low_pass_filter([quaternion[3]], cutoff, fs), highpass_cutoff, fs)[-1])
+    qw = high_pass_filter(low_pass_filter([quaternion[0]], cutoff, fs), highpass_cutoff, fs)[-1]
+    qx = high_pass_filter(low_pass_filter([quaternion[1]], cutoff, fs), highpass_cutoff, fs)[-1]
+    qy = high_pass_filter(low_pass_filter([quaternion[2]], cutoff, fs), highpass_cutoff, fs)[-1]
+    qz = high_pass_filter(low_pass_filter([quaternion[3]], cutoff, fs), highpass_cutoff, fs)[-1]
+
+    '''qw = quaternion[0]
+    qx = quaternion[1]
+    qy = quaternion[2]
+    qz = quaternion[3]'''
+
+    norm = math.sqrt(qw**2 + qx**2 + qy**2 + qz**2)
+    qw /= norm
+    qx /= norm
+    qy /= norm
+    qz /= norm
     
     # Calculate angles (roll, pitch, yaw)
     angles = np.zeros(3)

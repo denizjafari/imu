@@ -11,8 +11,8 @@ from calib_seq_v2 import load_calibration_0x28
 
 # Set up filtering parameters
 fs = 10.0
-cutoff = 2
-highpass_cutoff = 0.005
+cutoff = 0.0001
+highpass_cutoff = 1
 
 # Function to convert radians to degrees
 def rad_to_degrees(rad):
@@ -32,11 +32,10 @@ def read_angles(sensor, cutoff, highpass_cutoff, fs):
     if any(q is None for q in quaternion):
         return np.zeros(3)
 
-    # Apply filters to each quaternion component
-    qw = high_pass_filter(low_pass_filter([quaternion[0]], cutoff, fs), highpass_cutoff, fs)[-1]
-    qx = high_pass_filter(low_pass_filter([quaternion[1]], cutoff, fs), highpass_cutoff, fs)[-1]
-    qy = high_pass_filter(low_pass_filter([quaternion[2]], cutoff, fs), highpass_cutoff, fs)[-1]
-    qz = high_pass_filter(low_pass_filter([quaternion[3]], cutoff, fs), highpass_cutoff, fs)[-1]
+    qw = clip_data(low_pass_filter([quaternion[0]], cutoff, fs)[-1])
+    qx = clip_data(low_pass_filter([quaternion[1]], cutoff, fs)[-1])
+    qy = clip_data(low_pass_filter([quaternion[2]], cutoff, fs)[-1])
+    qz = clip_data(low_pass_filter([quaternion[3]], cutoff, fs)[-1])
 
     '''qw = quaternion[0]
     qx = quaternion[1]
@@ -107,5 +106,5 @@ while True:
         roll.pop(0)
         pitch.pop(0)
         yaw.pop(0)
-    
+   
     time.sleep(0.1)
